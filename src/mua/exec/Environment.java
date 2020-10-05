@@ -5,8 +5,9 @@ import java.util.Scanner;
 import mua.token.Tokenizer;
 import mua.token.TokenizerException;
 
-public class Environment {
+public class Environment implements AutoCloseable {
     public Scope globalScope;
+    public Scanner scanner;
 
     // convenient method for defining global function
     private void define(String name, boolean modifiable, int paramsCount, FunctionVal.InternalFunction fn) {
@@ -15,6 +16,7 @@ public class Environment {
 
     public Environment() {
         this.globalScope = new Scope(false);
+        this.scanner = new Scanner(System.in);
 
         // basic operations
         define("make", false, 2, (globalScope, outerScope, params) -> {
@@ -50,7 +52,10 @@ public class Environment {
             System.out.println(value.toString());
             return value;
         });
-        // TODO: read
+        define("read", false, 0, (globalScope, outerScope, params) -> {
+            if (!this.scanner.hasNext()) throw new MuaException("Unable to read word.");
+            return new LiteralVal(this.scanner.next());
+        });
 
         define("add", false, 2, (globalScope, outerScope, params) -> {
             double a = params.get(0).asNumberVal().content;
@@ -171,16 +176,20 @@ public class Environment {
         });
     }
 
+    public Value execLine() throws MuaException, TokenizerException {
+        var line = scanner.nextLine();
+        var tokens = Tokenizer.tokenize(line + "\n");
+        var value = Runner.execTokens(this.globalScope, this.globalScope, tokens);
+        return value;
+    }
+
     public static void main(String[] args) {
-        try (var scanner = new Scanner(System.in)) {
-            var env = new Environment();
+        try (var env = new Environment()) {
             do {
                 System.out.print("> ");
-                if (!scanner.hasNextLine()) break;
-                var line = scanner.nextLine();
+                if (!env.scanner.hasNextLine()) break;
                 try {
-                    var tokens = Tokenizer.tokenize(line + "\n"); 
-                    var value = Runner.execTokens(env.globalScope, env.globalScope, tokens);
+                    var value = env.execLine();
                     System.out.println(value);
                 } catch (TokenizerException e) {
                     // System.out.println(e.getMessage());
@@ -191,5 +200,10 @@ public class Environment {
                 }
             } while (true);
         }
+    }
+
+    @Override
+    public void close() {
+        if (this.scanner != null) this.scanner.close();
     }
 }
