@@ -23,8 +23,8 @@ public class MuaFunctionVal extends FunctionVal {
     public Value run(Scope globalScope, Scope outerScope, List<Value> params) throws MuaException {
         Scope localScope = new Scope(true);
         for (int i = 0; i < this.paramsCount(); ++i) {
-            var key = this.paramList.elements.get(i).asLiteralVal().content;
-            var value = params.get(i);
+            String key = this.paramList.elements.get(i).asLiteralVal().content;
+            Value value = params.get(i);
             localScope.variables.put(key, new Scope.Entry(true, value));
         }
         return Runner.execList(globalScope, localScope, this.code);
@@ -32,7 +32,7 @@ public class MuaFunctionVal extends FunctionVal {
 
     @Override
     public String toString() {
-        var buf = new StringBuffer();
+        StringBuffer buf = new StringBuffer();
         buf.append('(');
         for (int i = 0 ; i < this.paramList.elements.size(); ++i) {
             if (i != 0) buf.append(' ');

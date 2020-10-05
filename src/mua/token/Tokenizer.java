@@ -28,7 +28,7 @@ public class Tokenizer {
 
     // init state, state before a new token, usually at start of input or after whitespace, not when in list
     private void initState() throws TokenizerException {
-        final var ch = this.input.charAt(this.index);
+        final char ch = this.input.charAt(this.index);
         switch (ch) {
             // multiple whitespaces, igonre
             case ' ': case '\t': case '\n':
@@ -71,7 +71,7 @@ public class Tokenizer {
     }
 
     private void wordState() {
-        final var ch = this.input.charAt(this.index);
+        final char ch = this.input.charAt(this.index);
         // whitespace, thus end of word, append word and skip whitespace
         if (" \t\n".indexOf(ch) != -1) {
             this.state = State.INIT;
@@ -88,12 +88,12 @@ public class Tokenizer {
 
     private void numberState() throws TokenizerException {
         // here, we simply let Scanner do the parsing for us, skip necessary characters and append the number
-        try (var scanner = new Scanner(this.input.substring(this.index))) {
+        try (Scanner scanner = new Scanner(this.input.substring(this.index))) {
             if (!scanner.hasNextDouble()) {
                 throw new TokenizerException("Unable to parse number");
             } else {
                 // numbers are converted on demand, stored as string, so next() instead of nextDouble()
-                final var token = scanner.next();
+                final String token = scanner.next();
                 this.tokens.add(new WordToken(token));
                 this.state = State.INIT;
                 this.index += token.length();
@@ -102,7 +102,7 @@ public class Tokenizer {
     }
 
     private void colonState() throws TokenizerException {
-        var ch = this.input.charAt(this.index);
+        char ch = this.input.charAt(this.index);
         // colon, append "thing", continue
         if (ch == ':') {
             this.state = State.COLON;
@@ -126,7 +126,7 @@ public class Tokenizer {
 
     // begin of list item, or before right bracket
     private void listState() throws TokenizerException {
-        var ch = this.input.charAt(this.index);
+        char ch = this.input.charAt(this.index);
         // whitespace, ignore
         if (" \t\n".indexOf(ch) != -1) {
             this.state = State.LIST;
@@ -153,7 +153,7 @@ public class Tokenizer {
 
     // inside list item, including before last char
     private void listItemState() {
-        var ch = this.input.charAt(this.index);
+        char ch = this.input.charAt(this.index);
         // right bracket or whitespace, don't skip, let list state handle it
         // TODO: this won't allow ']' to be in a word in a list, is this the desired behavior?
         if (ch == ']' || " \t\n".indexOf(ch) != -1) {
@@ -168,7 +168,7 @@ public class Tokenizer {
     }
 
     private void opOrBoolState() throws TokenizerException {
-        var ch = this.input.charAt(this.index);
+        char ch = this.input.charAt(this.index);
         // only alphanumeric and underscore allowed in op, append to buf
         if ("0123456789abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(ch) != -1) {
             this.state = State.OP_OR_BOOL;
@@ -176,7 +176,7 @@ public class Tokenizer {
             ++this.index;
         // whitespace, end of op or bool, insert, don't skip
         } else if (" \t\n".indexOf(ch) != -1) {
-            var opOrBool = this.buf.toString();
+            String opOrBool = this.buf.toString();
             this.buf = null;
             if ("true".equals(opOrBool) || "false".equals(opOrBool)) {
                 this.tokens.add(new WordToken(opOrBool));
@@ -223,22 +223,22 @@ public class Tokenizer {
     }
 
     public static List<Token> tokenize(String input) throws TokenizerException {
-        var tokenizer = new Tokenizer();
+        Tokenizer tokenizer = new Tokenizer();
         tokenizer.feed(input);
         return tokenizer.finish();
     }
 
     // test
     public static void main(String[] args) throws Exception {
-        try (var scanner = new Scanner(System.in)) {
+        try (Scanner scanner = new Scanner(System.in)) {
             do {
                 System.out.print("> ");
                 if (!scanner.hasNextLine())
                     break;
-                var line = scanner.nextLine();
+                String line = scanner.nextLine();
                 try {
-                    var tokens = Tokenizer.tokenize(line);
-                    for (var token : tokens) {
+                    List<Token> tokens = Tokenizer.tokenize(line);
+                    for (Token token : tokens) {
                         System.out.print(token);
                         System.out.print(' ');
                     }

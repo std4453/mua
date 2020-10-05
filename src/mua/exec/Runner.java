@@ -34,15 +34,15 @@ public class Runner {
 
     // index before left bracket -> index before right bracket
     private Value execValueBracket() throws MuaException {
-        var elements = new Vector<Value>();
+        List<Value> elements = new Vector<>();
         // skip bracket
         ++this.index;
         for (; this.index < this.tokens.size(); ++this.index) {
-            var token = this.tokens.get(this.index);
+            Token token = this.tokens.get(this.index);
             if (token instanceof WordToken) {
                 elements.add(new LiteralVal(((WordToken)token).value));
             } else if (token instanceof BracketToken) {
-                var bracketToken = (BracketToken)token;
+                BracketToken bracketToken = (BracketToken)token;
                 if (bracketToken.type == Type.LEFT) {
                     elements.add(execValueBracket());
                 } else break;
@@ -53,16 +53,16 @@ public class Runner {
 
     // consume one statement, goes one-way only so a part of a token flow will work
     public Value execValue() throws MuaException {
-        var first = this.tokens.get(this.index);
+        Token first = this.tokens.get(this.index);
         if (first instanceof WordToken) {
             ++this.index;
             return new LiteralVal(((WordToken)first).value);
         } else if (first instanceof BracketToken && ((BracketToken)first).type == Type.LEFT) {
-            var value = execValueBracket();
+            Value value = execValueBracket();
             ++this.index;
             return value;
         } else if (first instanceof OpToken) {
-            var op = ((OpToken)first).name;
+            String op = ((OpToken)first).name;
             switch (op) {
                 // keywords
                 case "return":
@@ -77,8 +77,8 @@ public class Runner {
                 default:
                 {
                     ++this.index;
-                    var fn = Scope.getValue(globalScope, localScope, ((OpToken) first).name).asFunctionVal();
-                    var params = new Vector<Value>();
+                    FunctionVal fn = Scope.getValue(globalScope, localScope, ((OpToken) first).name).asFunctionVal();
+                    List<Value> params = new Vector<>();
                     for (int i = 0; i < fn.paramsCount(); ++i) {
                         params.add(this.execValue());
                     }
@@ -102,7 +102,7 @@ public class Runner {
 
     // execute tokens, might return null
     public static Value execTokens(Scope globalScope, Scope localScope, List<Token> tokens) throws MuaException {
-        var runner = new Runner(globalScope, localScope);
+        Runner runner = new Runner(globalScope, localScope);
         runner.feed(tokens);
         runner.execAll();
         return runner.retVal;
@@ -110,15 +110,15 @@ public class Runner {
 
     // execute list by joining words together with whitespaces, tokenize and execTokens
     public static Value execList(Scope globalScope, Scope localScope, ListVal list) throws MuaException {
-        var buf = new StringBuffer();
-        for (var value : list.elements) {
+        StringBuffer buf = new StringBuffer();
+        for (Value value : list.elements) {
             // throws error if any value cannot be converted to a literal
             // i.e., lists and functions
-            var str = value.asLiteralVal().content;
+            String str = value.asLiteralVal().content;
             buf.append(str).append(' ');
         } 
         try {
-            var tokens = Tokenizer.tokenize(buf.toString());
+            List<Token> tokens = Tokenizer.tokenize(buf.toString());
             return execTokens(globalScope, localScope, tokens);
         } catch (TokenizerException e) {
             throw new MuaException(String.format("Tokenize error: %s", e.getMessage()));

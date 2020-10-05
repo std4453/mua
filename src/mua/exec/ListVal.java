@@ -27,7 +27,7 @@ public class ListVal extends Value {
 
     @Override
     public String toString() {
-        var buf = new StringBuffer();
+        StringBuffer buf = new StringBuffer();
         buf.append('[');
         for (int i = 0; i < this.elements.size(); ++i) {
             if (i != 0) buf.append(' ');
