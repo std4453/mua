@@ -8,6 +8,11 @@ public class NumberVal extends Value {
     }
 
     @Override
+    public NumberVal asNumberVal() throws MuaException {
+        return this;
+    }
+
+    @Override
     public String toString() {
         return Double.toString(this.content);
     }
