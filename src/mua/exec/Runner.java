@@ -1,15 +1,15 @@
-package com.std4453.mua.exec;
+package mua.exec;
 
 import java.util.List;
 import java.util.Vector;
 
-import com.std4453.mua.token.BracketToken;
-import com.std4453.mua.token.OpToken;
-import com.std4453.mua.token.Token;
-import com.std4453.mua.token.Tokenizer;
-import com.std4453.mua.token.TokenizerException;
-import com.std4453.mua.token.WordToken;
-import com.std4453.mua.token.BracketToken.Type;
+import mua.token.BracketToken;
+import mua.token.OpToken;
+import mua.token.Token;
+import mua.token.Tokenizer;
+import mua.token.TokenizerException;
+import mua.token.WordToken;
+import mua.token.BracketToken.Type;
 
 public class Runner {
     private Scope globalScope;

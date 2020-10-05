@@ -1,9 +1,9 @@
-package com.std4453.mua.exec;
+package mua.exec;
 
 import java.util.Scanner;
 
-import com.std4453.mua.token.Tokenizer;
-import com.std4453.mua.token.TokenizerException;
+import mua.token.Tokenizer;
+import mua.token.TokenizerException;
 
 public class Environment {
     public Scope globalScope;

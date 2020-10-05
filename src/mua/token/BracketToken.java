@@ -1,4 +1,4 @@
-package com.std4453.mua.token;
+package mua.token;
 
 public class BracketToken extends Token {
     public enum Type {

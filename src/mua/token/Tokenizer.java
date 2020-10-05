@@ -1,10 +1,10 @@
-package com.std4453.mua.token;
+package mua.token;
 
 import java.util.List;
 import java.util.Scanner;
 import java.util.Vector;
 
-import com.std4453.mua.token.BracketToken.Type;
+import mua.token.BracketToken.Type;
 
 public class Tokenizer {
     private enum State {

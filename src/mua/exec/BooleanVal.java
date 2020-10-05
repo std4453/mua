@@ -1,4 +1,4 @@
-package com.std4453.mua.exec;
+package mua.exec;
 
 public class BooleanVal extends Value {
     public final boolean content;

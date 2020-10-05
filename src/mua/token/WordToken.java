@@ -1,4 +1,4 @@
-package com.std4453.mua.token;
+package mua.token;
 
 public class WordToken extends Token {
     public final String value;
