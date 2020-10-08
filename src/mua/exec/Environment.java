@@ -2,6 +2,8 @@ package mua.exec;
 
 import java.util.List;
 import java.util.Scanner;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import mua.token.Token;
 import mua.token.Tokenizer;
@@ -104,7 +106,16 @@ public class Environment implements AutoCloseable {
             boolean isName = outerScope.variables.containsKey(name) || globalScope.variables.containsKey(name);
             return new BooleanVal(isName);
         });
-        // TODO: readlist
+        define("readlist", false, 0, (globalScope, outerScope, params) -> {
+            if (!this.scanner.hasNextLine())
+                throw new MuaException("Unable to read line");
+            String line = this.scanner.nextLine();
+            List<Value> values = Stream
+                .of(line.split("\\s+"))
+                .map((String word) -> new LiteralVal(word))
+                .collect(Collectors.toList());
+            return new ListVal(values);
+        });
         define("repeat", false, 2, (globalScope, outerScope, params) -> {
             double number = params.get(0).asNumberVal().content;
             ListVal list = params.get(1).asListVal();
@@ -116,9 +127,8 @@ public class Environment implements AutoCloseable {
         });
 
         // if both numbers, compare them, otherwise compare words in lexicographical order
-        // TODO: auto type convertion
         define("eq", false, 2, (globalScope, outerScope, params) -> {
-            if (params.get(0) instanceof NumberVal && params.get(1) instanceof NumberVal) {
+            if (params.get(0).isNumberVal() && params.get(1).isNumberVal()) {
                 double a = params.get(0).asNumberVal().content;
                 double b = params.get(1).asNumberVal().content;
                 return new BooleanVal(a == b);
@@ -129,7 +139,7 @@ public class Environment implements AutoCloseable {
             }
         });
         define("lt", false, 2, (globalScope, outerScope, params) -> {
-            if (params.get(0) instanceof NumberVal && params.get(1) instanceof NumberVal) {
+            if (params.get(0).isNumberVal() && params.get(1).isNumberVal()) {
                 double a = params.get(0).asNumberVal().content;
                 double b = params.get(1).asNumberVal().content;
                 return new BooleanVal(a < b);
@@ -140,7 +150,7 @@ public class Environment implements AutoCloseable {
             }
         });
         define("gt", false, 2, (globalScope, outerScope, params) -> {
-            if (params.get(0) instanceof NumberVal && params.get(1) instanceof NumberVal) {
+            if (params.get(0).isNumberVal() && params.get(1).isNumberVal()) {
                 double a = params.get(0).asNumberVal().content;
                 double b = params.get(1).asNumberVal().content;
                 return new BooleanVal(a > b);
@@ -166,6 +176,8 @@ public class Environment implements AutoCloseable {
             return new BooleanVal(!val);
         });
 
+        // given mua's lazy evaluation nature, if can be implemented as an
+        // internal function
         define("if", false, 3, (globalScope, outerScope, params) -> {
             boolean cond = params.get(0).asBooleanVal().content;
             ListVal list1 = params.get(1).asListVal();
@@ -175,6 +187,26 @@ public class Environment implements AutoCloseable {
             } else {
                 return Runner.execList(globalScope, outerScope, list2);
             } 
+        });
+        define("isnumber", false, 1, (globalScope, outerScope, params) -> {
+            return new BooleanVal(params.get(0).isNumberVal());
+        });
+        define("isword", false, 1, (globalScope, outerScope, params) -> {
+            return new BooleanVal(params.get(0).isLiteralVal());
+        });
+        define("islist", false, 1, (globalScope, outerScope, params) -> {
+            return new BooleanVal(params.get(0).isListVal());
+        });
+        define("isbool", false, 1, (globalScope, outerScope, params) -> {
+            return new BooleanVal(params.get(0).isBooleanVal());
+        });
+        // list and words don't convert, so it's fine
+        define("isempty", false, 1, (globalScope, outerScope, params) -> {
+            if (params.get(0).isLiteralVal()) {
+                return new BooleanVal(params.get(0).asLiteralVal().content.isEmpty());
+            } else if (params.get(0).isListVal()) {
+                return new BooleanVal(params.get(0).asListVal().elements.isEmpty());
+            } else throw new MuaException("Value is not word or list");
         });
     }
 
