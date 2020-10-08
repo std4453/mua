@@ -1,7 +1,10 @@
 package mua.exec;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Random;
 import java.util.Scanner;
+import java.util.Vector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -13,6 +16,8 @@ public class Environment implements AutoCloseable {
     public Scope globalScope;
     public Scanner scanner;
 
+    private Random random;
+
     // convenient method for defining global function
     private void define(String name, boolean modifiable, int paramsCount, FunctionVal.InternalFunction fn) {
         this.globalScope.variables.put(name, new Scope.Entry(modifiable, FunctionVal.makeInternalFunction(paramsCount, fn)));
@@ -21,6 +26,7 @@ public class Environment implements AutoCloseable {
     public Environment() {
         this.globalScope = new Scope(false);
         this.scanner = new Scanner(System.in);
+        this.random = new Random();
 
         // basic operations
         define("make", false, 2, (globalScope, outerScope, params) -> {
@@ -207,6 +213,118 @@ public class Environment implements AutoCloseable {
             } else if (params.get(0).isListVal()) {
                 return new BooleanVal(params.get(0).asListVal().elements.isEmpty());
             } else throw new MuaException("Value is not word or list");
+        });
+
+        // type convertion is done automatically by asLiteralVal()
+        define("word", false, 2, (globalScope, outerScope, params) -> {
+            String pre = params.get(0).asLiteralVal().content;
+            String post = params.get(1).asLiteralVal().content;
+            return new LiteralVal(pre + post);
+        });
+        define("sentence", false, 2, (globalScope, outerScope, params) -> {
+            return new ListVal(Stream
+                .concat(
+                    params.get(0).asListVal().elements.stream(),
+                    params.get(1).asListVal().elements.stream())
+                .collect(Collectors.toList()));
+        });
+        define("list", false, 2, (globalScope, outerScope, params) -> {
+            return new ListVal(List.of(params.get(0), params.get(1)));
+        });
+        define("join", false, 2, (globalScope, outerScope, params) -> {
+            return new ListVal(Stream
+                .concat(
+                    params.get(0).asListVal().elements.stream(),
+                    Stream.of(params.get(1)))
+                .collect(Collectors.toList()));
+        });
+        define("first", false, 1, (globalScope, outerScope, params) -> {
+            Value val = params.get(0);
+            if (val.isLiteralVal()) {
+                return new LiteralVal(Character.toString(
+                    val.asLiteralVal().content.charAt(0)
+                ));
+            } else {
+                return val.asListVal().elements.firstElement();
+            }
+        });
+        define("last", false, 1, (globalScope, outerScope, params) -> {
+            Value val = params.get(0);
+            if (val.isLiteralVal()) {
+                String str = val.asLiteralVal().content;
+                return new LiteralVal(Character.toString(
+                    str.charAt(str.length() - 1)
+                ));
+            } else {
+                return val.asListVal().elements.lastElement();
+            }
+        });
+        define("butfirst", false, 1, (globalScope, outerScope, params) -> {
+            Value val = params.get(0);
+            if (val.isLiteralVal()) {
+                String str = val.asLiteralVal().content;
+                return new LiteralVal(str.substring(1));
+            } else {
+                List<Value> values = val.asListVal().elements;
+                return new ListVal(values.subList(1, values.size()));
+            }
+        });
+        define("butlast", false, 1, (globalScope, outerScope, params) -> {
+            Value val = params.get(0);
+            if (val.isLiteralVal()) {
+                String str = val.asLiteralVal().content;
+                return new LiteralVal(str.substring(0, str.length() - 1));
+            } else {
+                List<Value> values = val.asListVal().elements;
+                return new ListVal(values.subList(0, values.size() - 1));
+            }
+        });
+
+        define("random", false, 1, (globalScope, outerScope, params) -> {
+            // this allows non-positive bounds, which does not exactly match
+            // the [0, number) requirement
+            double bound = params.get(0).asNumberVal().content;
+            return new NumberVal(this.random.nextDouble() * bound);
+        });
+        define("int", false, 1, (globalScope, outerScope, params) -> {
+            double value = params.get(0).asNumberVal().content;
+            return new NumberVal(Math.floor(value));
+        });
+        define("sqrt", false, 1, (globalScope, outerScope, params) -> {
+            double value = params.get(0).asNumberVal().content;
+            // if value is negative, will return NaN
+            return new NumberVal(Math.sqrt(value));
+        });
+
+        // TODO: save, load
+        define("erall", false, 0, (globalScope, outerScope, params) -> {
+            List<String> erases = new Vector<>();
+            for (Map.Entry<String, Scope.Entry> entry : outerScope.variables.entrySet()) {
+                if (entry.getValue().modifiable) {
+                    erases.add(entry.getKey());
+                }
+            }
+            for (String key : erases) {
+                outerScope.variables.remove(key);
+            }
+            return new BooleanVal(true);
+        });
+        define("poall", false, 0, (globalScope, outerScope, params) -> {
+            List<Value> names = new Vector<>();
+            for (Map.Entry<String, Scope.Entry> entry : outerScope.variables.entrySet()) {
+                // non-modifiable values are considered internal and
+                // not displayed by poall
+                if (entry.getValue().modifiable) {
+                    names.add(new LiteralVal(entry.getKey()));
+                }
+            }
+            return new ListVal(names);
+        });
+
+        this.globalScope.variables.put("pi", new Scope.Entry(true, new NumberVal(Math.PI)));
+        define("run", true, 1, (globalScope, outerScope, params) -> {
+            ListVal list = params.get(0).asListVal();
+            return Runner.execList(globalScope, outerScope, list);
         });
     }
 
