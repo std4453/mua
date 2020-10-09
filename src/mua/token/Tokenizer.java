@@ -8,7 +8,7 @@ import mua.token.BracketToken.Type;
 
 public class Tokenizer {
     private enum State {
-        INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP_OR_BOOL, ERROR, FINISH
+        INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP, ERROR, FINISH
     }
 
     // global states
@@ -60,7 +60,7 @@ public class Tokenizer {
             default:
                 // alpha, begin of op or bool
                 if ("abcdefghijklmnopqrstuvwxyz".indexOf(ch) != -1) {
-                    this.state = State.OP_OR_BOOL;
+                    this.state = State.OP;
                     this.buf = new StringBuffer();
                 // otherwise, error
                 } else {
@@ -167,22 +167,17 @@ public class Tokenizer {
         }
     }
 
-    private void opOrBoolState() throws TokenizerException {
+    private void opState() throws TokenizerException {
         char ch = this.input.charAt(this.index);
         // only alphanumeric and underscore allowed in op, append to buf
         if ("0123456789abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(ch) != -1) {
-            this.state = State.OP_OR_BOOL;
+            this.state = State.OP;
             this.buf.append(ch);
             ++this.index;
         // whitespace, end of op or bool, insert, don't skip
         } else if (" \t\n".indexOf(ch) != -1) {
-            String opOrBool = this.buf.toString();
+            this.tokens.add(new OpToken(this.buf.toString()));
             this.buf = null;
-            if ("true".equals(opOrBool) || "false".equals(opOrBool)) {
-                this.tokens.add(new WordToken(opOrBool));
-            } else {
-                this.tokens.add(new OpToken(opOrBool));
-            }
             this.state = State.INIT;
         } else {
             throw new TokenizerException(String.format("Unexcepted character '%c'", ch));
@@ -202,7 +197,7 @@ public class Tokenizer {
                     case LEFT_BRACKET: this.leftBracketState(); break;
                     case LIST: this.listState(); break;
                     case LIST_ITEM: this.listItemState(); break;
-                    case OP_OR_BOOL: this.opOrBoolState(); break;
+                    case OP: this.opState(); break;
                     default: throw new TokenizerException("Invalid tokenizer state!");
                 }
             }

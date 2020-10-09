@@ -28,6 +28,14 @@ public class Environment implements AutoCloseable {
         this.scanner = new Scanner(System.in);
         this.random = new Random();
 
+        // boolean values are functions
+        define("true", false, 0, (globalScope, outerScope, params) -> {
+            return new BooleanVal(true);
+        });
+        define("false", false, 0, (globalScope, outerScope, params) -> {
+            return new BooleanVal(false);
+        });
+
         // basic operations
         define("make", false, 2, (globalScope, outerScope, params) -> {
             String name = params.get(0).asLiteralVal().content;
