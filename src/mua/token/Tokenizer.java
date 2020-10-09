@@ -8,7 +8,7 @@ import mua.token.BracketToken.Type;
 
 public class Tokenizer {
     private enum State {
-        INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP, ERROR, FINISH
+        INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP, ERROR, FINISH, MATH, MINUS
     }
 
     // global states
@@ -42,7 +42,7 @@ public class Tokenizer {
                 ++this.index;
                 break;
             // numbers, don't skip
-            case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9': case '-':
+            case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
                 this.state = State.NUMBER;
                 break;
             // left bracket, don't skip
@@ -55,6 +55,17 @@ public class Tokenizer {
             // enter colon state, don't skip
             case ':':
                 this.state = State.COLON;
+                break;
+            // in tokenizer we don't distinguish mathematical operators
+            case '(': case ')': case '+': case '*': case '/': case '%':
+                this.state = State.MATH;
+                this.buf = new StringBuffer();
+                this.buf.append(ch);
+                ++this.index;
+                break;
+            // '-' can either be a operator or begging of a negative number, thus a dedicated state
+            case '-':
+                this.state = State.MINUS;
                 break;
             // otherwise
             default:
@@ -184,6 +195,30 @@ public class Tokenizer {
         }
     }
 
+    private void minusState() throws TokenizerException {
+        // look-forward, possible defects
+        char next = this.input.charAt(this.index + 1);
+        // whitespace following, math state
+        if (" \t\n".indexOf(next) != -1) {
+            this.state = State.MATH;
+            this.buf = new StringBuffer();
+            this.buf.append('-');
+            ++this.index;
+        // digits, part of number
+        } else if ("1234567890".indexOf(next) != -1) {
+            this.state = State.NUMBER;
+        } else throw new TokenizerException(String.format("Unexpected character '%c'", next));
+    }
+
+    private void mathState() throws TokenizerException {
+        char ch = this.input.charAt(this.index);
+        if (" \t\n".indexOf(ch) != -1) {
+            this.state = State.INIT;
+            this.tokens.add(new MathToken(this.buf.toString()));
+            this.buf = null;
+        } else throw new TokenizerException(String.format("Unexpected character '%c'", ch));
+    }
+
     public void feed(String input) throws TokenizerException {
         try {
             this.input = input;
@@ -198,6 +233,8 @@ public class Tokenizer {
                     case LIST: this.listState(); break;
                     case LIST_ITEM: this.listItemState(); break;
                     case OP: this.opState(); break;
+                    case MATH: this.mathState(); break;
+                    case MINUS: this.minusState(); break;
                     default: throw new TokenizerException("Invalid tokenizer state!");
                 }
             }
@@ -232,7 +269,7 @@ public class Tokenizer {
                     break;
                 String line = scanner.nextLine();
                 try {
-                    List<Token> tokens = Tokenizer.tokenize(line);
+                    List<Token> tokens = Tokenizer.tokenize(line + ' ');
                     for (Token token : tokens) {
                         System.out.print(token);
                         System.out.print(' ');
