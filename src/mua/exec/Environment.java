@@ -1,5 +1,12 @@
 package mua.exec;
 
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -304,7 +311,32 @@ public class Environment implements AutoCloseable {
             return new NumberVal(Math.sqrt(value));
         });
 
-        // TODO: save, load
+        define("save", false, 1, (globalScope, outerScope, params) -> {
+            String filename = params.get(0).asLiteralVal().content;
+            try(FileOutputStream fos = new FileOutputStream(filename)) {
+                ObjectOutputStream oos = new ObjectOutputStream(fos);
+                // save scope simply by writeObject(), since Scope and Value are serializable
+                // and immutable
+                oos.writeObject(outerScope.removeInternals());
+            } catch (IOException e) {
+                throw new MuaException(String.format("Cannot save file: %s", e.getMessage()));
+            }
+            return new LiteralVal(filename);
+        });
+        define("load", false, 1, (globalScope, outerScope, params) -> {
+            String filename = params.get(0).asLiteralVal().content;
+            try (FileInputStream fis = new FileInputStream(filename)) {
+                ObjectInputStream ois = new ObjectInputStream(fis);
+                Object obj = ois.readObject();
+                if (!(obj instanceof Scope)) {
+                    throw new MuaException(String.format("Invalid file \"%s\"", filename));
+                }
+                outerScope.mergeScope((Scope)obj);
+            } catch (IOException | ClassNotFoundException e) {
+                throw new MuaException(String.format("Cannot load file: %s", e.getMessage()));
+            }
+            return new BooleanVal(true);
+        });
         define("erall", false, 0, (globalScope, outerScope, params) -> {
             List<String> erases = new Vector<>();
             for (Map.Entry<String, Scope.Entry> entry : outerScope.variables.entrySet()) {
@@ -330,7 +362,8 @@ public class Environment implements AutoCloseable {
         });
 
         this.globalScope.variables.put("pi", new Scope.Entry(true, new NumberVal(Math.PI)));
-        define("run", true, 1, (globalScope, outerScope, params) -> {
+        // TODO: run is an InternalFunctionVal and cannot be serialized
+        define("run", false, 1, (globalScope, outerScope, params) -> {
             ListVal list = params.get(0).asListVal();
             return Runner.execList(globalScope, outerScope, list);
         });

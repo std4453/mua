@@ -1,6 +1,13 @@
 package mua.exec;
 
-public class Value {
+import java.io.Serializable;
+
+public class Value implements Serializable {
+    /**
+     *
+     */
+    private static final long serialVersionUID = 5790626257369920438L;
+
     public BooleanVal asBooleanVal() throws MuaException {
         throw new MuaException(String.format("Cannot convert to boolean: %s", this));
     }
