@@ -362,7 +362,7 @@ public class Environment implements AutoCloseable {
         });
 
         this.globalScope.variables.put("pi", new Scope.Entry(true, new NumberVal(Math.PI)));
-        // TODO: run is an InternalFunctionVal and cannot be serialized
+        // run is now internal
         define("run", false, 1, (globalScope, outerScope, params) -> {
             ListVal list = params.get(0).asListVal();
             return Runner.execList(globalScope, outerScope, list);
