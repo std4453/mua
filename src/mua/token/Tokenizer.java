@@ -11,6 +11,8 @@ public class Tokenizer {
         INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP, ERROR, FINISH, MATH, MINUS
     }
 
+    private static final String TOKEN_DELIMITER = " \t\n)";
+
     // global states
     private State state;
     private String input;
@@ -56,8 +58,14 @@ public class Tokenizer {
             case ':':
                 this.state = State.COLON;
                 break;
+            // parentheses are separate tokens and returns to INIT immediately
+            case '(': case ')':
+                this.state = State.INIT;
+                this.tokens.add(new MathToken(Character.toString(ch)));
+                ++this.index;
+                break;
             // in tokenizer we don't distinguish mathematical operators
-            case '(': case ')': case '+': case '*': case '/': case '%':
+            case '+': case '*': case '/': case '%':
                 this.state = State.MATH;
                 this.buf = new StringBuffer();
                 this.buf.append(ch);
@@ -83,7 +91,7 @@ public class Tokenizer {
 
     private void wordState() {
         final char ch = this.input.charAt(this.index);
-        // whitespace, thus end of word, append word and skip whitespace
+        // ')' is not end of word
         if (" \t\n".indexOf(ch) != -1) {
             this.state = State.INIT;
             this.tokens.add(new WordToken(buf.toString()));
@@ -100,6 +108,9 @@ public class Tokenizer {
     private void numberState() throws TokenizerException {
         // here, we simply let Scanner do the parsing for us, skip necessary characters and append the number
         try (Scanner scanner = new Scanner(this.input.substring(this.index))) {
+            // consider ')' end of token
+            // TODO: explanation
+            scanner.useDelimiter("\\s|\\)");
             if (!scanner.hasNextDouble()) {
                 throw new TokenizerException("Unable to parse number");
             } else {
@@ -139,6 +150,7 @@ public class Tokenizer {
     private void listState() throws TokenizerException {
         char ch = this.input.charAt(this.index);
         // whitespace, ignore
+        // note that ')' is not skipped, since ')' is valid content of a list
         if (" \t\n".indexOf(ch) != -1) {
             this.state = State.LIST;
             ++this.index;
@@ -167,6 +179,8 @@ public class Tokenizer {
         char ch = this.input.charAt(this.index);
         // right bracket or whitespace, don't skip, let list state handle it
         // TODO: this won't allow ']' to be in a word in a list, is this the desired behavior?
+        // ')' is not here either and considered same with other characters
+        // this allows ')' to be in lists
         if (ch == ']' || " \t\n".indexOf(ch) != -1) {
             this.state = State.LIST;
             this.tokens.add(new WordToken(this.buf.toString()));
@@ -186,7 +200,7 @@ public class Tokenizer {
             this.buf.append(ch);
             ++this.index;
         // whitespace, end of op or bool, insert, don't skip
-        } else if (" \t\n".indexOf(ch) != -1) {
+        } else if (TOKEN_DELIMITER.indexOf(ch) != -1) {
             this.tokens.add(new OpToken(this.buf.toString()));
             this.buf = null;
             this.state = State.INIT;
@@ -196,10 +210,10 @@ public class Tokenizer {
     }
 
     private void minusState() throws TokenizerException {
-        // look-forward, possible defects
+        // TODO: look-forward, possible defects
         char next = this.input.charAt(this.index + 1);
         // whitespace following, math state
-        if (" \t\n".indexOf(next) != -1) {
+        if (TOKEN_DELIMITER.indexOf(next) != -1) {
             this.state = State.MATH;
             this.buf = new StringBuffer();
             this.buf.append('-');
@@ -212,7 +226,7 @@ public class Tokenizer {
 
     private void mathState() throws TokenizerException {
         char ch = this.input.charAt(this.index);
-        if (" \t\n".indexOf(ch) != -1) {
+        if (TOKEN_DELIMITER.indexOf(ch) != -1) {
             this.state = State.INIT;
             this.tokens.add(new MathToken(this.buf.toString()));
             this.buf = null;
