@@ -3,14 +3,19 @@ package mua.token;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Vector;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import mua.token.BracketToken.Type;
 
 public class Tokenizer {
     private enum State {
-        INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP, ERROR, FINISH, MATH, MINUS
+        INIT, WORD, NUMBER, COLON, LEFT_BRACKET, LIST, LIST_ITEM, OP, ERROR, FINISH, MINUS
     }
 
+    private static final String WHITESPACES = " \t\n";
+    private static final String TOKEN_BOUNDS = WHITESPACES + "()+-*/";
+    private static final String WORD_BOUNDS = WHITESPACES;
     private static final String TOKEN_DELIMITER = " \t\n)";
 
     // global states
@@ -32,7 +37,7 @@ public class Tokenizer {
     private void initState() throws TokenizerException {
         final char ch = this.input.charAt(this.index);
         switch (ch) {
-            // multiple whitespaces, igonre
+            // whitespaces, igonre
             case ' ': case '\t': case '\n':
                 this.state = State.INIT;
                 ++this.index;
@@ -54,21 +59,17 @@ public class Tokenizer {
             // init state is not in list, so error
             case ']':
                 throw new TokenizerException("Unexpected token ']'!");
-            // enter colon state, don't skip
+            // skip, enter colon state
             case ':':
+                ++this.index;
+                this.buf = new StringBuffer();
+                this.tokens.add(new OpToken("thing"));
                 this.state = State.COLON;
                 break;
-            // parentheses are separate tokens and returns to INIT immediately
-            case '(': case ')':
+            // math tokens are considered separate
+            case '(': case ')': case '+': case '*': case '/': case '%':
                 this.state = State.INIT;
                 this.tokens.add(new MathToken(Character.toString(ch)));
-                ++this.index;
-                break;
-            // in tokenizer we don't distinguish mathematical operators
-            case '+': case '*': case '/': case '%':
-                this.state = State.MATH;
-                this.buf = new StringBuffer();
-                this.buf.append(ch);
                 ++this.index;
                 break;
             // '-' can either be a operator or begging of a negative number, thus a dedicated state
@@ -92,7 +93,7 @@ public class Tokenizer {
     private void wordState() {
         final char ch = this.input.charAt(this.index);
         // ')' is not end of word
-        if (" \t\n".indexOf(ch) != -1) {
+        if (WORD_BOUNDS.indexOf(ch) != -1) {
             this.state = State.INIT;
             this.tokens.add(new WordToken(buf.toString()));
             this.buf = null;
@@ -108,9 +109,12 @@ public class Tokenizer {
     private void numberState() throws TokenizerException {
         // here, we simply let Scanner do the parsing for us, skip necessary characters and append the number
         try (Scanner scanner = new Scanner(this.input.substring(this.index))) {
-            // consider ')' end of token
-            // TODO: explanation
-            scanner.useDelimiter("\\s|\\)");
+            // stop at end of token
+            scanner.useDelimiter(TOKEN_BOUNDS
+                .chars()
+                .mapToObj(Character::toString)
+                .map(Pattern::quote)
+                .collect(Collectors.joining("|")));
             if (!scanner.hasNextDouble()) {
                 throw new TokenizerException("Unable to parse number");
             } else {
@@ -123,19 +127,22 @@ public class Tokenizer {
         }
     }
 
+    // almost identical to op state
     private void colonState() throws TokenizerException {
         char ch = this.input.charAt(this.index);
-        // colon, append "thing", continue
-        if (ch == ':') {
+        // only alphanumeric and underscore allowed in colon, append to buf
+        if ("0123456789abcdefghijklmnopqrstuvwxyz_ABCDEFGHIJKLMNOPQRSTUVWXYZ".indexOf(ch) != -1) {
             this.state = State.COLON;
-            this.tokens.add(new OpToken("thing"));
+            this.buf.append(ch);
             ++this.index;
-        // begin of variable, thus end of colons, to word state, don't skip
-        } else if ("abcdefghijklmnopqrstuvwxyz".indexOf(ch) != -1) {
-            this.state = State.WORD;
-            this.buf = new StringBuffer();
-        // not begin of variable, invalid
-        } else throw new TokenizerException(String.format("Unexpected char '%c'", ch));
+        // token end, insert, don't skip
+        } else if (TOKEN_BOUNDS.indexOf(ch) != -1) {
+            this.tokens.add(new WordToken(this.buf.toString()));
+            this.buf = null;
+            this.state = State.INIT;
+        } else {
+            throw new TokenizerException(String.format("Unexcepted character '%c'", ch));
+        }
     }
 
     private void leftBracketState() {
@@ -149,9 +156,8 @@ public class Tokenizer {
     // begin of list item, or before right bracket
     private void listState() throws TokenizerException {
         char ch = this.input.charAt(this.index);
-        // whitespace, ignore
-        // note that ')' is not skipped, since ')' is valid content of a list
-        if (" \t\n".indexOf(ch) != -1) {
+        // stop at word bounds since list items are words without preceding '"'
+        if (WORD_BOUNDS.indexOf(ch) != -1) {
             this.state = State.LIST;
             ++this.index;
         // left bracket, begin of sublist,
@@ -179,9 +185,7 @@ public class Tokenizer {
         char ch = this.input.charAt(this.index);
         // right bracket or whitespace, don't skip, let list state handle it
         // TODO: this won't allow ']' to be in a word in a list, is this the desired behavior?
-        // ')' is not here either and considered same with other characters
-        // this allows ')' to be in lists
-        if (ch == ']' || " \t\n".indexOf(ch) != -1) {
+        if (ch == ']' || WHITESPACES.indexOf(ch) != -1) {
             this.state = State.LIST;
             this.tokens.add(new WordToken(this.buf.toString()));
             this.buf = null;
@@ -199,8 +203,8 @@ public class Tokenizer {
             this.state = State.OP;
             this.buf.append(ch);
             ++this.index;
-        // whitespace, end of op or bool, insert, don't skip
-        } else if (TOKEN_DELIMITER.indexOf(ch) != -1) {
+        // token end, insert, don't skip
+        } else if (TOKEN_BOUNDS.indexOf(ch) != -1) {
             this.tokens.add(new OpToken(this.buf.toString()));
             this.buf = null;
             this.state = State.INIT;
@@ -212,25 +216,15 @@ public class Tokenizer {
     private void minusState() throws TokenizerException {
         // TODO: look-forward, possible defects
         char next = this.input.charAt(this.index + 1);
-        // whitespace following, math state
+        // token bound, append token and skip
         if (TOKEN_DELIMITER.indexOf(next) != -1) {
-            this.state = State.MATH;
-            this.buf = new StringBuffer();
-            this.buf.append('-');
+            this.state = State.INIT;
+            this.tokens.add(new MathToken("-"));
             ++this.index;
         // digits, part of number
         } else if ("1234567890".indexOf(next) != -1) {
             this.state = State.NUMBER;
         } else throw new TokenizerException(String.format("Unexpected character '%c'", next));
-    }
-
-    private void mathState() throws TokenizerException {
-        char ch = this.input.charAt(this.index);
-        if (TOKEN_DELIMITER.indexOf(ch) != -1) {
-            this.state = State.INIT;
-            this.tokens.add(new MathToken(this.buf.toString()));
-            this.buf = null;
-        } else throw new TokenizerException(String.format("Unexpected character '%c'", ch));
     }
 
     public void feed(String input) throws TokenizerException {
@@ -247,7 +241,6 @@ public class Tokenizer {
                     case LIST: this.listState(); break;
                     case LIST_ITEM: this.listItemState(); break;
                     case OP: this.opState(); break;
-                    case MATH: this.mathState(); break;
                     case MINUS: this.minusState(); break;
                     default: throw new TokenizerException("Invalid tokenizer state!");
                 }
