@@ -18,6 +18,11 @@ public abstract class FunctionVal extends Value {
 
     public static FunctionVal makeInternalFunction(int paramsCount, InternalFunction fn) {
         return new FunctionVal(){
+            /**
+             *
+             */
+            private static final long serialVersionUID = 1L;
+
             @Override
             public int paramsCount() {
                 return paramsCount;
