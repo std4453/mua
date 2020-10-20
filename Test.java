@@ -40,7 +40,7 @@ public class Test {
             String[] a = line.split(",");
             this.type = Type.valueOf(a[0].toUpperCase());
             this.value = a[1];
-            this.mark = Integer.valueOf(a[2]);
+            this.mark = Integer.valueOf(a[2].trim());
             this.comment = a[3];
         }
         public boolean judge(String line) {
