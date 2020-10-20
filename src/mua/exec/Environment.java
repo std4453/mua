@@ -242,7 +242,10 @@ public class Environment implements AutoCloseable {
                 .collect(Collectors.toList()));
         });
         define("list", false, 2, (globalScope, outerScope, params) -> {
-            return new ListVal(List.of(params.get(0), params.get(1)));
+            List<Value> list = new Vector<>();
+            list.add(params.get(0));
+            list.add(params.get(1));
+            return new ListVal(list);
         });
         define("join", false, 2, (globalScope, outerScope, params) -> {
             return new ListVal(Stream

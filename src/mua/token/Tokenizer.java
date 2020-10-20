@@ -113,7 +113,7 @@ public class Tokenizer {
             // stop at end of token
             scanner.useDelimiter(TOKEN_BOUNDS
                 .chars()
-                .mapToObj(Character::toString)
+                .mapToObj((int ch) -> Character.toString((char)ch))
                 .map(Pattern::quote)
                 .collect(Collectors.joining("|")));
             if (!scanner.hasNextDouble()) {

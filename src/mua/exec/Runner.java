@@ -66,13 +66,15 @@ public class Runner {
         public boolean finished = false;
     }
 
-    private static final Map<String, MathOp> ops = new HashMap<>() {{
-        put("+", MathOp.create(2, 1, MathOp.Associativity.LEFT, (a, b) -> a + b));
-        put("-", MathOp.create(2, 1, MathOp.Associativity.LEFT, (a, b) -> a - b));
-        put("*", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a * b));
-        put("/", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a / b));
-        put("%", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a % b));
-    }};
+    private static final Map<String, MathOp> ops = new HashMap<>();
+
+    static {
+        Runner.ops.put("+", MathOp.create(2, 1, MathOp.Associativity.LEFT, (a, b) -> a + b));
+        Runner.ops.put("-", MathOp.create(2, 1, MathOp.Associativity.LEFT, (a, b) -> a - b));
+        Runner.ops.put("*", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a * b));
+        Runner.ops.put("/", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a / b));
+        Runner.ops.put("%", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a % b));
+    }
 
     private Scope globalScope;
     private Scope localScope;
