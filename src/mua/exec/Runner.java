@@ -28,11 +28,13 @@ public class Runner {
             LEFT, RIGHT
         }
 
+        public final int ops;
         public final int priority;
         public final Associativity associativity;
         public final MathOpInterface fn;
 
-        public MathOp(int priority, Associativity associativity, MathOpInterface fn) {
+        public MathOp(int ops, int priority, Associativity associativity, MathOpInterface fn) {
+            this.ops = ops;
             this.priority = priority;
             this.associativity = associativity;
             this.fn = fn;
@@ -46,8 +48,8 @@ public class Runner {
             }
         }
 
-        public static MathOp create(int priority, Associativity associativity, BiFunction<Double, Double, Double> fn) {
-            return new MathOp(priority, associativity, (values) -> {
+        public static MathOp create(int ops, int priority, Associativity associativity, BiFunction<Double, Double, Double> fn) {
+            return new MathOp(ops, priority, associativity, (values) -> {
                 Double op2 = values.pop().asNumberVal().content;
                 Double op1 = values.pop().asNumberVal().content;
                 Double result = fn.apply(op1, op2);
@@ -56,12 +58,20 @@ public class Runner {
         }
     }
 
+    private static class MathLayer {
+        public Stack<Value> valueStack = new Stack<>();
+        public Stack<String> opStack = new Stack<>();
+        // see comments in execValueLeftParen()
+        public int opExpectation = 1;
+        public boolean finished = false;
+    }
+
     private static final Map<String, MathOp> ops = new HashMap<>() {{
-        put("+", MathOp.create(1, MathOp.Associativity.LEFT, (a, b) -> a + b));
-        put("-", MathOp.create(1, MathOp.Associativity.LEFT, (a, b) -> a - b));
-        put("*", MathOp.create(2, MathOp.Associativity.LEFT, (a, b) -> a * b));
-        put("/", MathOp.create(2, MathOp.Associativity.LEFT, (a, b) -> a / b));
-        put("%", MathOp.create(2, MathOp.Associativity.LEFT, (a, b) -> a % b));
+        put("+", MathOp.create(2, 1, MathOp.Associativity.LEFT, (a, b) -> a + b));
+        put("-", MathOp.create(2, 1, MathOp.Associativity.LEFT, (a, b) -> a - b));
+        put("*", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a * b));
+        put("/", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a / b));
+        put("%", MathOp.create(2, 2, MathOp.Associativity.LEFT, (a, b) -> a % b));
     }};
 
     private Scope globalScope;
@@ -72,8 +82,6 @@ public class Runner {
     
     private boolean shouldReturn;
     private Value retVal;
-    private Stack<Stack<Value>> valuesStacks;
-    private Stack<Stack<String>> opsStacks; 
 
     public Runner(Scope globalScope, Scope localScope) {
         this.globalScope = globalScope;
@@ -84,8 +92,6 @@ public class Runner {
 
         this.shouldReturn = false;
         this.retVal = null;
-        this.valuesStacks = new Stack<>();
-        this.opsStacks = new Stack<>();
     }
 
     // index before left bracket -> index before right bracket
@@ -109,19 +115,25 @@ public class Runner {
 
     // after left parentheses, return after right parentheses, stack unchanged
     private Value execValueLeftParen() throws MuaException {
-        int startDepth = this.valuesStacks.size();
-        this.valuesStacks.push(new Stack<>());
-        this.opsStacks.push(new Stack<>());
+        MathLayer layer = new MathLayer();
         // loop until reaches right paren
         Value lastVal = null;
         while (true) {
             // exec value, whether function, pure value, list or expression
-            lastVal = this.execValue();
+            lastVal = this.execValue(layer);
             // right paren, exit loop
-            if (this.valuesStacks.size() <= startDepth) break;
+            if (layer.finished) break;
             // push value to stack, op is pushed to stack by execValueMath()
             if (lastVal != null) {
-                this.valuesStacks.peek().push(lastVal);
+                layer.valueStack.push(lastVal);
+                // about opExpectation:
+                // opExpectation lets us know whether the next value should be operator or operand,
+                // to decide whether '-' is minus or negate. opExpectation is initially 1, and
+                // increases (ops - 1) on each operator, decreases 1 on each operand.
+                // normally, opExpectation should be either 0 or 1, since we're not expecting to support
+                // tenary operators, so if it's 0, we know that '-' must be minus (otherwise it becomes
+                // -1), if it's 1, '-' must be negate (otherwise it becomes 2).
+                --layer.opExpectation;
             }
         }
         // last lastVal should be from execValueRightParen(), which is the final value 
@@ -130,9 +142,9 @@ public class Runner {
 
     // collapse current expression by evaluating all operators with
     // priority >= priorityThres 
-    private void collapseMathExp(int priorityThres) throws MuaException {
-        Stack<String> opsStack = this.opsStacks.peek();
-        Stack<Value> valuesStack = this.valuesStacks.peek();
+    private void collapseMathExp(MathLayer layer, int priorityThres) throws MuaException {
+        Stack<String> opsStack = layer.opStack;
+        Stack<Value> valuesStack = layer.valueStack;
         while (!opsStack.isEmpty() && ops.get(opsStack.peek()).priority >= priorityThres) {
             String op = opsStack.pop();
             ops.get(op).calc(valuesStack);
@@ -140,28 +152,30 @@ public class Runner {
     } 
 
     // before right parentheses, pops stack
-    private Value execValueRightParen() throws MuaException {
-        if (this.valuesStacks.isEmpty()) throw new MuaException("Unexpected token \")\"");
+    private Value execValueRightParen(MathLayer layer) throws MuaException {
+        if (layer == null) throw new MuaException("Unexpected token \")\"");
         // proceed
         ++this.index;
         // minimum priority is 1, so collapses all operators, i.e., finish the calculation
-        this.collapseMathExp(0);
-        Stack<String> opsStack = this.opsStacks.peek();
-        Stack<Value> valuesStack = this.valuesStacks.peek();
+        this.collapseMathExp(layer, 0);
+        Stack<String> opsStack = layer.opStack;
+        Stack<Value> valuesStack = layer.valueStack;
         if (valuesStack.size() != 1 || opsStack.size() != 0)
             throw new MuaException("Malformed mathematical expression");
         Value result = valuesStack.pop();
         // remove stack so that execValueLeftParen can exit; 
-        opsStacks.pop();
-        valuesStacks.pop();
+        layer.finished = true;
         return result;
     }
 
     // before math op, return null
-    private void execValueMath() throws MuaException {
+    private void execValueMath(MathLayer layer) throws MuaException {
+        if (layer == null) throw new MuaException("Math expressions must be within parentheses");
+
         Token first = this.tokens.get(this.index);
         ++this.index;
         String op = ((MathToken)first).op;
+
         if (!ops.containsKey(op)) throw new MuaException(String.format("Unknown operator \"%s\"", op));
         MathOp mop = ops.get(op);
         // if left associative, operators with same priority can be evaluated, so don't
@@ -169,13 +183,18 @@ public class Runner {
         int priorityThres = mop.priority + (
             mop.associativity == MathOp.Associativity.LEFT ? 0 : 1
         );
-        collapseMathExp(priorityThres);
-        if (this.opsStacks.isEmpty()) throw new MuaException("Math expressions must be within parentheses");
-        this.opsStacks.peek().push(op);
+        collapseMathExp(layer, priorityThres);
+        layer.opStack.push(op);
+        // see comments in execValueLeftParen()
+        layer.opExpectation += mop.ops - 1;
+    }
+
+    public Value execValue() throws MuaException {
+        return this.execValue(null);
     }
 
     // consume one statement, goes one-way only so a part of a token flow will work
-    public Value execValue() throws MuaException {
+    public Value execValue(MathLayer layer) throws MuaException {
         Token first = this.tokens.get(this.index);
         if (first instanceof WordToken) {
             ++this.index;
@@ -214,9 +233,17 @@ public class Runner {
                     ++this.index;
                     return this.execValueLeftParen();
                 case ")":
-                    return this.execValueRightParen();
+                    return this.execValueRightParen(layer);
+                case "-":
+                    // if '-' is outside of parens or opExpectation is 1 (see comments in
+                    // execValueLeftParen()), then it must be negate
+                    if (layer == null || layer.opExpectation == 1) {
+                        ++this.index;
+                        return new NumberVal(-this.execValue().asNumberVal().content);
+                    }
+                    // otherwise minus, intentional fallthrough
                 default:
-                    this.execValueMath();
+                    this.execValueMath(layer);
                     return null;
             }
         } else throw new MuaException(String.format("Unexpected token: %s", first));

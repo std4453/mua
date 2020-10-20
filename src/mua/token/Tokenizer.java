@@ -14,7 +14,7 @@ public class Tokenizer {
     }
 
     private static final String WHITESPACES = " \t\n";
-    private static final String TOKEN_BOUNDS = WHITESPACES + "()+-*/";
+    private static final String TOKEN_BOUNDS = WHITESPACES + "()+-*/%";
     private static final String WORD_BOUNDS = WHITESPACES;
     private static final String TOKEN_DELIMITER = " \t\n)";
 
@@ -67,14 +67,15 @@ public class Tokenizer {
                 this.state = State.COLON;
                 break;
             // math tokens are considered separate
-            case '(': case ')': case '+': case '*': case '/': case '%':
+            // '-' can either be a operator or beginning of a negative number, however this cannot be
+            // distinguished at tokenize pass, so '-' must go as a separate token type.
+            // consider the code (foo 1 -2), we don't know whether '-' here is negative of minus
+            // until runtime since foo can take one or two parameter(s).
+            // so at tokenize pass, we treat '-' as math token always
+            case '(': case ')': case '+': case '*': case '/': case '%': case '-':
                 this.state = State.INIT;
                 this.tokens.add(new MathToken(Character.toString(ch)));
                 ++this.index;
-                break;
-            // '-' can either be a operator or begging of a negative number, thus a dedicated state
-            case '-':
-                this.state = State.MINUS;
                 break;
             // otherwise
             default:
