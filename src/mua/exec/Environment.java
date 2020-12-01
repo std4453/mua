@@ -13,6 +13,7 @@ import java.util.Vector;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import mua.Debug;
 import mua.token.Token;
 import mua.token.Tokenizer;
 import mua.token.TokenizerException;
@@ -135,15 +136,16 @@ public class Environment implements AutoCloseable {
                 .collect(Collectors.toList());
             return new ListVal(values);
         });
-        define("repeat", false, 2, (globalScope, outerScope, params) -> {
-            double number = params.get(0).asNumberVal().content;
-            ListVal list = params.get(1).asListVal();
-            Value retVal = null;
-            for (int i = 0; i < number; ++i) {
-                retVal = Runner.execList(globalScope, outerScope, list);
-            }
-            return retVal;
-        });
+        // MUA P3: disabled temporarily
+        // define("repeat", false, 2, (globalScope, outerScope, params) -> {
+        //     double number = params.get(0).asNumberVal().content;
+        //     ListVal list = params.get(1).asListVal();
+        //     Value retVal = null;
+        //     for (int i = 0; i < number; ++i) {
+        //         retVal = Runner.execList(globalScope, outerScope, list);
+        //     }
+        //     return retVal;
+        // });
 
         // if both numbers, compare them, otherwise compare words in lexicographical order
         define("eq", false, 2, (globalScope, outerScope, params) -> {
@@ -371,9 +373,14 @@ public class Environment implements AutoCloseable {
     }
 
     public Value execLine() throws MuaException, TokenizerException {
+        Debug.log("execLine {\n");
+        Debug.increaseLevel();
         String line = scanner.nextLine();
+        Debug.log("input: ", line, "\n");
         List<Token> tokens = Tokenizer.tokenize(line + "\n");
         Value value = Runner.execTokens(this.globalScope, this.globalScope, tokens);
+        Debug.decreaseLevel();
+        Debug.log("}\n");
         return value;
     }
 

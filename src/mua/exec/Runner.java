@@ -8,6 +8,7 @@ import java.util.Stack;
 import java.util.Vector;
 import java.util.function.BiFunction;
 
+import mua.Debug;
 import mua.token.BracketToken;
 import mua.token.MathToken;
 import mua.token.OpToken;
@@ -214,6 +215,7 @@ public class Runner {
                     // TODO: return should be first one of statement
                     if (!this.localScope.inFunction) throw new MuaException("Cannot return outside of a function");
                     ++this.index;
+                    this.retVal = this.execValue();
                     this.shouldReturn = true;
                     return this.retVal;
                 }
@@ -265,9 +267,14 @@ public class Runner {
 
     // execute tokens, might return null
     public static Value execTokens(Scope globalScope, Scope localScope, List<Token> tokens) throws MuaException {
+        Debug.log("execTokens {\n");
+        Debug.increaseLevel();
+        Debug.log("tokens: ", tokens, "\n");
         Runner runner = new Runner(globalScope, localScope);
         runner.feed(tokens);
         runner.execAll();
+        Debug.decreaseLevel();
+        Debug.log("}\n");
         return runner.retVal;
     }
 

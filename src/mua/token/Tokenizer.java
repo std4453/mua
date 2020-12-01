@@ -6,6 +6,7 @@ import java.util.Vector;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import mua.Debug;
 import mua.token.BracketToken.Type;
 
 public class Tokenizer {
@@ -265,7 +266,9 @@ public class Tokenizer {
     public static List<Token> tokenize(String input) throws TokenizerException {
         Tokenizer tokenizer = new Tokenizer();
         tokenizer.feed(input);
-        return tokenizer.finish();
+        List<Token> tokens = tokenizer.finish();
+        Debug.log("tokens: ", tokens, "\n");
+        return tokens;
     }
 
     // test

@@ -26,6 +26,11 @@ public class ListVal extends Value {
     }
 
     @Override
+    public LiteralVal asLiteralVal() throws MuaException {
+        return new LiteralVal(this.toString());
+    }
+
+    @Override
     public String toString() {
         StringBuffer buf = new StringBuffer();
         buf.append('[');
