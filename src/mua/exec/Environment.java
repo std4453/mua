@@ -384,6 +384,16 @@ public class Environment implements AutoCloseable {
         return value;
     }
 
+    public void execAll() throws MuaException, TokenizerException {
+        StringBuffer sb = new StringBuffer();
+        while (scanner.hasNextLine()) {
+            sb.append(scanner.nextLine()).append('\n');
+        }
+        List<Token> tokens = Tokenizer.tokenize(sb.toString());
+        Value value = Runner.execTokens(this.globalScope, this.globalScope, tokens);
+    }
+
+
     // REPL
     public static void main(String[] args) {
         try (Environment env = new Environment()) {
