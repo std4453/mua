@@ -3,8 +3,13 @@ package mua.exec;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -30,8 +35,12 @@ public class Environment implements AutoCloseable {
     }
 
     public Environment() {
+        this(System.in);
+    }
+
+    public Environment(InputStream in) {
         this.globalScope = new Scope(false);
-        this.scanner = new Scanner(System.in);
+        this.scanner = new Scanner(in);
         this.random = new Random();
 
         // boolean values are functions
@@ -73,7 +82,8 @@ public class Environment implements AutoCloseable {
         });
         define("print", false, 1, (globalScope, outerScope, params) -> {
             Value value = params.get(0);
-            System.out.println(value.toString());
+            if (value instanceof ListVal) System.out.println(value.asListVal().toString(true));
+            else System.out.println(value.toString());
             return value;
         });
         define("read", false, 0, (globalScope, outerScope, params) -> {
@@ -123,7 +133,9 @@ public class Environment implements AutoCloseable {
         });
         define("isname", false, 1, (globalScope, outerScope, params) -> {
             String name = params.get(0).asLiteralVal().content;
-            boolean isName = outerScope.variables.containsKey(name) || globalScope.variables.containsKey(name);
+            boolean isName = 
+                (outerScope.variables.containsKey(name) && outerScope.variables.get(name).modifiable) ||
+                (globalScope.variables.containsKey(name) && globalScope.variables.get(name).modifiable);
             return new BooleanVal(isName);
         });
         define("readlist", false, 0, (globalScope, outerScope, params) -> {
@@ -223,10 +235,11 @@ public class Environment implements AutoCloseable {
         });
         // list and words don't convert, so it's fine
         define("isempty", false, 1, (globalScope, outerScope, params) -> {
-            if (params.get(0).isLiteralVal()) {
-                return new BooleanVal(params.get(0).asLiteralVal().content.isEmpty());
-            } else if (params.get(0).isListVal()) {
-                return new BooleanVal(params.get(0).asListVal().elements.isEmpty());
+            Value param = params.get(0);
+            if (param instanceof ListVal) {
+                return new BooleanVal(param.asListVal().elements.isEmpty());
+            } else if(param.isLiteralVal()) {
+                return new BooleanVal(param.asLiteralVal().content.isEmpty());
             } else throw new MuaException("Value is not word or list");
         });
 
@@ -258,12 +271,12 @@ public class Environment implements AutoCloseable {
         });
         define("first", false, 1, (globalScope, outerScope, params) -> {
             Value val = params.get(0);
-            if (val.isLiteralVal()) {
+            if (val instanceof ListVal) {
+                return val.asListVal().elements.firstElement();
+            } else {
                 return new LiteralVal(Character.toString(
                     val.asLiteralVal().content.charAt(0)
                 ));
-            } else {
-                return val.asListVal().elements.firstElement();
             }
         });
         define("last", false, 1, (globalScope, outerScope, params) -> {
@@ -279,22 +292,22 @@ public class Environment implements AutoCloseable {
         });
         define("butfirst", false, 1, (globalScope, outerScope, params) -> {
             Value val = params.get(0);
-            if (val.isLiteralVal()) {
+            if (val instanceof ListVal) {
+                List<Value> values = val.asListVal().elements;
+                return new ListVal(values.size() > 0 ? values.subList(1, values.size()) : new ArrayList<>());
+            } else {
                 String str = val.asLiteralVal().content;
                 return new LiteralVal(str.substring(1));
-            } else {
-                List<Value> values = val.asListVal().elements;
-                return new ListVal(values.subList(1, values.size()));
             }
         });
         define("butlast", false, 1, (globalScope, outerScope, params) -> {
             Value val = params.get(0);
-            if (val.isLiteralVal()) {
+            if (val instanceof ListVal) {
+                List<Value> values = val.asListVal().elements;
+                return new ListVal(values.size() > 0 ? values.subList(0, values.size() - 1) : new ArrayList<>());
+            } else {
                 String str = val.asLiteralVal().content;
                 return new LiteralVal(str.substring(0, str.length() - 1));
-            } else {
-                List<Value> values = val.asListVal().elements;
-                return new ListVal(values.subList(0, values.size() - 1));
             }
         });
 
@@ -317,10 +330,11 @@ public class Environment implements AutoCloseable {
         define("save", false, 1, (globalScope, outerScope, params) -> {
             String filename = params.get(0).asLiteralVal().content;
             try(FileOutputStream fos = new FileOutputStream(filename)) {
-                ObjectOutputStream oos = new ObjectOutputStream(fos);
-                // save scope simply by writeObject(), since Scope and Value are serializable
-                // and immutable
-                oos.writeObject(outerScope.removeInternals());
+                PrintWriter writer = new PrintWriter(fos);
+                for (Map.Entry<String, Scope.Entry> entry : outerScope.removeInternals().variables.entrySet()) {
+                    writer.println("make \"" + entry.getKey() + " " + entry.getValue().value.toMakableString());
+                }
+                writer.flush();
             } catch (IOException e) {
                 throw new MuaException(String.format("Cannot save file: %s", e.getMessage()));
             }
@@ -328,14 +342,11 @@ public class Environment implements AutoCloseable {
         });
         define("load", false, 1, (globalScope, outerScope, params) -> {
             String filename = params.get(0).asLiteralVal().content;
-            try (FileInputStream fis = new FileInputStream(filename)) {
-                ObjectInputStream ois = new ObjectInputStream(fis);
-                Object obj = ois.readObject();
-                if (!(obj instanceof Scope)) {
-                    throw new MuaException(String.format("Invalid file \"%s\"", filename));
-                }
-                outerScope.mergeScope((Scope)obj);
-            } catch (IOException | ClassNotFoundException e) {
+            try {
+                String content = Files.lines(Paths.get(filename)).collect(Collectors.joining("\n")) + "\n";
+                List<Token> tokens = Tokenizer.tokenize(content);
+                Runner.execTokens(globalScope, globalScope, tokens);
+            } catch (IOException | TokenizerException e) {
                 throw new MuaException(String.format("Cannot load file: %s", e.getMessage()));
             }
             return new BooleanVal(true);

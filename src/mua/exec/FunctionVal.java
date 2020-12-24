@@ -34,4 +34,9 @@ public abstract class FunctionVal extends Value {
             }
         };
     }
+
+    @Override
+    public String toMakableString() throws MuaException {
+        throw new MuaException("function cannot be converted to makeable string");
+    }
 }

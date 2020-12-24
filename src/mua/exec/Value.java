@@ -72,4 +72,8 @@ public class Value implements Serializable {
             return false;
         }
     }
+
+    public String toMakableString() throws MuaException {
+        return this.toString();
+    }
 }

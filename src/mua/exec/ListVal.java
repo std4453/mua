@@ -30,15 +30,20 @@ public class ListVal extends Value {
         return new LiteralVal(this.toString());
     }
 
-    @Override
-    public String toString() {
+    public String toString(boolean noBrackets) {
         StringBuffer buf = new StringBuffer();
-        buf.append('[');
+        if (!noBrackets) buf.append('[');
         for (int i = 0; i < this.elements.size(); ++i) {
-            if (i != 0) buf.append(' ');
+            if (i != 0)
+                buf.append(' ');
             buf.append(this.elements.get(i));
         }
-        buf.append(']');
+        if (!noBrackets) buf.append(']');
         return buf.toString();
+    }
+
+    @Override
+    public String toString() {
+        return this.toString(false);
     }
 }

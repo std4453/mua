@@ -6,6 +6,8 @@ public class Main {
     public static void main(String[] args) throws Exception {
         try (Environment env = new Environment()) {
             env.execAll();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

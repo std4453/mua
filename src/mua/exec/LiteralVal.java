@@ -1,5 +1,8 @@
 package mua.exec;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class LiteralVal extends Value {
     public final String content;
 
@@ -29,7 +32,19 @@ public class LiteralVal extends Value {
     }
 
     @Override
+    public ListVal asListVal() throws MuaException {
+        List<Value> elements = new ArrayList<>();
+        elements.add(this);
+        return new ListVal(elements);
+    }
+
+    @Override
     public String toString() {
         return this.content;
+    }
+
+    @Override
+    public String toMakableString() throws MuaException {
+        return "\"" + this.toString();
     }
 }
